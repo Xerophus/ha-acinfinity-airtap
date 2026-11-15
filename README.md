@@ -16,7 +16,7 @@ same account are ignored, so this can run alongside
 
 | Entity | What it does |
 |---|---|
-| `fan.<name>` | On/off and speed (10 levels). Shows the real level in every mode. Setting it switches the fan to **Fan** mode. Off = Fan mode at level 0 (the AIRTAP has no Off mode). Turning on reuses the last Fan mode level, or 5. |
+| `fan.<name>` | On/off is the unit's power, the same as the app's power button: off fully powers the unit down, and on resumes its saved mode and level. Speed has 10 levels and shows the real level in every mode. Setting a speed switches to **Fan** mode, powering on first if needed. 0 % powers off. |
 | `select.<name>_mode` | Fan, Cool, Heat, Temp AI. *Advanced* (schedules made in the app) is shown but can't be selected. Switching to Cool/Heat/Temp AI keeps that mode's saved settings. |
 | `sensor.<name>_temperature` | Room temperature from the fan's sensor. |
 | `sensor.<name>_fan_level` | Current level, 0–10. |
@@ -49,6 +49,8 @@ details redacted.
 - Modes (`atType`): 0 Fan, 1 Cool, 2 Heat, 3 Temp AI (default), 15 Advanced. These are
   **not** the UIS controllers' numbers.
 - The fan level is written as `onSpead` (the API's spelling). `onSpeed` is accepted but ignored.
+- Power is `powerState` (1/0) with `modeAndSettingIdStr=[22]`. While the unit is off,
+  level and mode writes are saved but don't start it. Verified on a T6 2026-11-14.
 - Writes need the `minversion: 3.5` header and the minimal parameter set. AIRTAPs reject
   the full payloads used for controllers.
 

@@ -19,6 +19,7 @@ from .const import (
     API_HOST,
     FIELD_AT_TYPE,
     FIELD_ON_SPEED,
+    FIELD_POWER,
     MAX_LEVEL,
     Mode,
 )
@@ -81,6 +82,7 @@ class AirtapDevice:
     firmware: str | None
     hardware: str | None
     online: bool
+    power_on: bool | None  # deviceInfo.powerState; the unit's own power button
     temperature_c: float | None
     temperature_f: float | None
     level: int | None  # current fan level, 0-10 ("speak")
@@ -106,6 +108,7 @@ class AirtapDevice:
     ) -> AirtapDevice:
         info = raw.get("deviceInfo") or {}
         wind = _int(info.get("isWindSteering"))
+        power = _int(info.get("powerState"))
         device = cls(
             dev_id=str(raw["devId"]),
             name=raw.get("devName") or f"AIRTAP {raw['devId']}",
@@ -113,6 +116,7 @@ class AirtapDevice:
             firmware=raw.get("firmwareVersion"),
             hardware=raw.get("hardwareVersion"),
             online=bool(_int(raw.get("online", info.get("online")))),
+            power_on=None if power is None else power == 1,
             temperature_c=_hundredths(info.get("temperature")),
             temperature_f=_hundredths(info.get("temperatureF")),
             level=_int(info.get("speak")),
@@ -192,8 +196,16 @@ class AirtapClient:
             body = await self._call("POST", PATH_MODE_SETTINGS, data=data)
         return body.get("data")
 
+    async def set_power(self, dev_id: str, on: bool) -> dict[str, Any]:
+        """Power the unit on or off, as the app's power button does.
+
+        Powering on resumes the saved mode and level. While the unit is off,
+        level and mode writes are stored but don't start it.
+        """
+        return await self.send_command(dev_id, {"powerState": int(on)}, [FIELD_POWER])
+
     async def set_fan_level(self, dev_id: str, level: int) -> dict[str, Any]:
-        """Switch to Fan mode at a fixed level; level 0 stops the fan."""
+        """Switch to Fan mode at a fixed level; level 0 stops the fan but leaves it powered."""
         if not 0 <= level <= MAX_LEVEL:
             raise ValueError(f"level must be 0-{MAX_LEVEL}, got {level}")
         return await self.send_command(

@@ -83,11 +83,22 @@ class AirtapCoordinator(DataUpdateCoordinator[dict[str, AirtapDevice]]):
                 {**self.data, dev_id: replace(self.data[dev_id], **values)}
             )
 
+    async def async_set_power(self, dev_id: str, on: bool) -> None:
+        """Power the unit on (resuming its saved mode and level) or off."""
+        await self._write(self.client.set_power(dev_id, on))
+        if on:
+            self._remember(dev_id, power_on=True)
+        else:
+            self._remember(dev_id, power_on=False, level=0)
+
     async def async_set_fan_level(self, dev_id: str, level: int) -> None:
-        """Fan mode at a fixed level (0 = stopped)."""
+        """Fan mode at a fixed level (0 = stopped). Powers the unit on first if needed."""
+        device = self.data.get(dev_id) if self.data else None
+        if device is not None and device.power_on is False:
+            await self._write(self.client.set_power(dev_id, True))
         await self._write(self.client.set_fan_level(dev_id, level))
-        self._remember(dev_id, mode=int(Mode.FAN), current_mode=int(Mode.FAN),
-                       level=level, fan_mode_level=level)
+        self._remember(dev_id, power_on=True, mode=int(Mode.FAN),
+                       current_mode=int(Mode.FAN), level=level, fan_mode_level=level)
 
     async def async_set_mode(self, dev_id: str, mode: Mode) -> None:
         """Cool, Heat or Temp AI, with that mode's saved settings."""

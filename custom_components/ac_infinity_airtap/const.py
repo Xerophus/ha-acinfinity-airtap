@@ -52,6 +52,7 @@ MODE_BY_OPTION: dict[str, Mode] = {v: k for k, v in MODE_OPTIONS.items()}
 # modeAndSettingIdStr lists the ids of the fields a PUT changes.
 FIELD_AT_TYPE = 16
 FIELD_ON_SPEED = 18
+FIELD_POWER = 22  # powerState; same id as AC Infinity's room-to-room fans use
 
 SERVICE_SEND_RAW_COMMAND = "send_raw_command"
 ATTR_PARAMS = "params"

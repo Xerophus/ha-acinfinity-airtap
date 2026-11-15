@@ -81,54 +81,77 @@ async def test_set_percentage(hass, entry, mock_client, percentage, level):
     assert hass.states.get(MODE).state == "fan"
 
 
-async def test_turn_off_and_on(hass, entry, mock_client):
+async def test_turn_off_powers_down(hass, entry, mock_client):
     await setup(hass, entry)
     await hass.services.async_call("fan", "turn_off", {"entity_id": FAN}, blocking=True)
-    mock_client.set_fan_level.assert_awaited_with(p.DEV_ID, 0)
+    mock_client.set_power.assert_awaited_once_with(p.DEV_ID, False)
+    mock_client.set_fan_level.assert_not_awaited()
     assert hass.states.get(FAN).state == "off"
     assert hass.states.get(FAN).attributes["percentage"] == 0
 
-    mock_client.set_fan_level.reset_mock()
-    await hass.services.async_call("fan", "turn_on", {"entity_id": FAN}, blocking=True)
-    # level 0 was the last Fan mode level, so it falls back to the default
-    mock_client.set_fan_level.assert_awaited_once_with(p.DEV_ID, 5)
 
-
-async def test_turn_on_reuses_saved_fan_level(hass, entry, mock_client):
+async def test_percentage_zero_powers_down(hass, entry, mock_client):
     await setup(hass, entry)
-    await hass.services.async_call("fan", "turn_on", {"entity_id": FAN}, blocking=True)
-    mock_client.set_fan_level.assert_awaited_once_with(p.DEV_ID, 7)
+    await hass.services.async_call(
+        "fan", "set_percentage", {"entity_id": FAN, "percentage": 0}, blocking=True
+    )
+    mock_client.set_power.assert_awaited_once_with(p.DEV_ID, False)
+    mock_client.set_fan_level.assert_not_awaited()
 
 
-async def test_written_state_survives_stale_poll(hass, entry, mock_client, freezer: FrozenDateTimeFactory):
+def powered_off(**overrides):
+    device = make_device(powerState=0, speak=0, **overrides)
+    return device
+
+
+async def test_turn_on_resumes_saved_mode(hass, entry, mock_client):
+    mock_client.get_airtaps.return_value = [powered_off()]
     await setup(hass, entry)
-    await hass.services.async_call("fan", "turn_off", {"entity_id": FAN}, blocking=True)
-
-    # the cloud still reports the old level on the next poll
-    freezer.tick(timedelta(seconds=11))
-    async_fire_time_changed(hass)
-    await hass.async_block_till_done()
     assert hass.states.get(FAN).state == "off"
-
-    # and reports it for longer than the pending window: the cloud wins
-    with patch("custom_components.ac_infinity_airtap.coordinator.time.monotonic", return_value=1e12):
-        freezer.tick(timedelta(seconds=11))
-        async_fire_time_changed(hass)
-        await hass.async_block_till_done()
+    await hass.services.async_call("fan", "turn_on", {"entity_id": FAN}, blocking=True)
+    mock_client.set_power.assert_awaited_once_with(p.DEV_ID, True)
+    mock_client.set_fan_level.assert_not_awaited()
     assert hass.states.get(FAN).state == "on"
 
 
-async def test_pending_cleared_once_cloud_agrees(hass, entry, mock_client, freezer):
+async def test_turn_on_when_already_on_does_nothing(hass, entry, mock_client):
     await setup(hass, entry)
-    await hass.services.async_call("fan", "turn_off", {"entity_id": FAN}, blocking=True)
-    stopped = make_device(speak=0, curMode=0)
-    stopped.mode = 0
-    stopped.fan_mode_level = 0
-    mock_client.get_airtaps.return_value = [stopped]
-    freezer.tick(timedelta(seconds=11))
-    async_fire_time_changed(hass)
-    await hass.async_block_till_done()
-    assert entry.runtime_data._pending == {}
+    await hass.services.async_call("fan", "turn_on", {"entity_id": FAN}, blocking=True)
+    mock_client.set_power.assert_not_awaited()
+    mock_client.set_fan_level.assert_not_awaited()
+
+
+async def test_turn_on_fan_mode_at_zero_uses_default_level(hass, entry, mock_client):
+    device = powered_off(curMode=0)
+    device.mode = 0
+    device.fan_mode_level = 0
+    mock_client.get_airtaps.return_value = [device]
+    await setup(hass, entry)
+    await hass.services.async_call("fan", "turn_on", {"entity_id": FAN}, blocking=True)
+    mock_client.set_power.assert_awaited_once_with(p.DEV_ID, True)
+    mock_client.set_fan_level.assert_awaited_once_with(p.DEV_ID, 5)
+
+
+async def test_set_speed_while_off_powers_on_first(hass, entry, mock_client):
+    mock_client.get_airtaps.return_value = [powered_off()]
+    await setup(hass, entry)
+    calls = []
+    mock_client.set_power.side_effect = lambda *a: calls.append(("power", *a)) or p.UPDATE_OK
+    mock_client.set_fan_level.side_effect = lambda *a: calls.append(("level", *a)) or p.UPDATE_OK
+    await hass.services.async_call(
+        "fan", "turn_on", {"entity_id": FAN, "percentage": 60}, blocking=True
+    )
+    assert calls == [("power", p.DEV_ID, True), ("level", p.DEV_ID, 6)]
+    assert hass.states.get(FAN).attributes["percentage"] == 60
+
+
+async def test_set_speed_while_on_skips_power(hass, entry, mock_client):
+    await setup(hass, entry)
+    await hass.services.async_call(
+        "fan", "set_percentage", {"entity_id": FAN, "percentage": 20}, blocking=True
+    )
+    mock_client.set_power.assert_not_awaited()
+    mock_client.set_fan_level.assert_awaited_once_with(p.DEV_ID, 2)
 
 
 @pytest.mark.parametrize(("option", "mode"), [("cool", Mode.COOL), ("heat", Mode.HEAT), ("temp_ai", Mode.TEMP_AI)])
@@ -160,7 +183,7 @@ async def test_select_advanced_refused(hass, entry, mock_client):
 
 async def test_command_failure_raises(hass, entry, mock_client):
     await setup(hass, entry)
-    mock_client.set_fan_level.side_effect = AirtapApiError("100001 param error")
+    mock_client.set_power.side_effect = AirtapApiError("100001 param error")
     with pytest.raises(HomeAssistantError, match="command failed"):
         await hass.services.async_call("fan", "turn_off", {"entity_id": FAN}, blocking=True)
     assert hass.states.get(FAN).state == "on"

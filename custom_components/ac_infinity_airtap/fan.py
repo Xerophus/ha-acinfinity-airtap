@@ -1,4 +1,4 @@
-"""Fan entity: on/off and level (Fan mode) for each AIRTAP."""
+"""Fan entity: power and level for each AIRTAP."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from homeassistant.util.percentage import (
     ranged_value_to_percentage,
 )
 
-from .const import DEFAULT_ON_LEVEL, MAX_LEVEL
+from .const import DEFAULT_ON_LEVEL, MAX_LEVEL, Mode
 from .coordinator import AirtapConfigEntry
 from .entity import AirtapEntity
 
@@ -30,10 +30,11 @@ async def async_setup_entry(
 
 
 class AirtapFan(AirtapEntity, FanEntity):
-    """Shows the fan's actual level in any mode; setting it switches to Fan mode.
+    """On/off is the unit's power, as in the app; speed is Fan mode's level.
 
-    The AIRTAP has no Off mode: off is Fan mode at level 0, so turning the fan
-    off (or on) leaves Cool, Heat or Temp AI.
+    Turning on resumes the saved mode and level. Setting a speed switches to
+    Fan mode (powering on first if needed). The percentage shows the actual
+    level in every mode.
     """
 
     _attr_name = None  # the device name
@@ -48,12 +49,16 @@ class AirtapFan(AirtapEntity, FanEntity):
 
     @property
     def is_on(self) -> bool | None:
-        level = self.device.level
-        return None if level is None else level > 0
+        device = self.device
+        if device.power_on is not None:
+            return device.power_on
+        return None if device.level is None else device.level > 0
 
     @property
     def percentage(self) -> int | None:
         level = self.device.level
+        if self.device.power_on is False:
+            return 0
         if level is None:
             return None
         return 0 if level == 0 else ranged_value_to_percentage(LEVEL_RANGE, level)
@@ -63,9 +68,10 @@ class AirtapFan(AirtapEntity, FanEntity):
         return {"level": self.device.level}
 
     async def async_set_percentage(self, percentage: int) -> None:
-        level = 0 if percentage == 0 else math.ceil(
-            percentage_to_ranged_value(LEVEL_RANGE, percentage)
-        )
+        if percentage == 0:
+            await self.async_turn_off()
+            return
+        level = math.ceil(percentage_to_ranged_value(LEVEL_RANGE, percentage))
         await self.coordinator.async_set_fan_level(self._dev_id, level)
 
     async def async_turn_on(
@@ -77,10 +83,12 @@ class AirtapFan(AirtapEntity, FanEntity):
         if percentage is not None:
             await self.async_set_percentage(percentage)
             return
-        last = self.device.fan_mode_level
-        await self.coordinator.async_set_fan_level(
-            self._dev_id, last if last else DEFAULT_ON_LEVEL
-        )
+        device = self.device
+        if device.effective_mode == Mode.FAN and not device.fan_mode_level:
+            # Fan mode at level 0 would power on to a stopped fan.
+            await self.coordinator.async_set_fan_level(self._dev_id, DEFAULT_ON_LEVEL)
+        elif device.power_on is not True:
+            await self.coordinator.async_set_power(self._dev_id, True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self.coordinator.async_set_fan_level(self._dev_id, 0)
+        await self.coordinator.async_set_power(self._dev_id, False)

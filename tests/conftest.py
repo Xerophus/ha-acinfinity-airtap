@@ -34,6 +34,7 @@ def mock_client():
         client.get_airtaps = AsyncMock(return_value=[make_device()])
         client.login = AsyncMock()
         client.set_fan_level = AsyncMock(return_value=p.UPDATE_OK)
+        client.set_power = AsyncMock(return_value=p.UPDATE_OK)
         client.set_mode = AsyncMock(return_value=p.UPDATE_OK)
         client.send_command = AsyncMock(return_value=p.UPDATE_OK)
         yield client

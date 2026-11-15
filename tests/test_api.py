@@ -127,6 +127,7 @@ async def test_get_airtaps_parses_t6_and_skips_other_controllers(session, client
     assert d.level == 4
     assert d.current_mode == 3
     assert d.vent_open is True
+    assert d.power_on is True
     assert d.mode == Mode.TEMP_AI
     assert d.fan_mode_level == 7
     assert d.cool_trigger_f == 80
@@ -188,6 +189,19 @@ async def test_set_fan_level_uses_api_spelling(session, client):
     assert put.headers["token"] == p.TOKEN
 
 
+@pytest.mark.parametrize(("on", "value"), [(True, "1"), (False, "0")])
+async def test_set_power(session, client, on, value):
+    session.add("PUT", PATH_MODE_AND_SETTING, p.UPDATE_OK)
+    await client.set_power(p.DEV_ID, on)
+    (put,) = session.made("PUT", PATH_MODE_AND_SETTING)
+    assert put.query == {
+        "devId": p.DEV_ID,
+        "port": "0",
+        "powerState": value,
+        "modeAndSettingIdStr": "[22]",
+    }
+
+
 @pytest.mark.parametrize("level", [-1, 11])
 async def test_set_fan_level_range(client, level):
     with pytest.raises(ValueError):
@@ -237,4 +251,5 @@ def test_unknown_values_parse_to_none():
     assert d.dev_id == "5"
     assert d.level is None
     assert d.vent_open is None
+    assert d.power_on is None
     assert d.online is False

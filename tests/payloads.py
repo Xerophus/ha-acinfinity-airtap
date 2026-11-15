@@ -36,6 +36,7 @@ AIRTAP_T6 = {
         "sensors": None,
         "isWindSteering": 1,
         "aiTriggerSta": 1,
+        "powerState": 1,
     },
     "firmwareVersion": "2.0.29",
     "hardwareVersion": "3.0",
