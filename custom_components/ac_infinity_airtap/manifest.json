@@ -1,13 +1,13 @@
 {
   "domain": "ac_infinity_airtap",
   "name": "AC Infinity AIRTAP",
-  "codeowners": [],
+  "codeowners": ["@Xerophus"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/OWNER/ha-acinfinity-airtap",
+  "documentation": "https://github.com/Xerophus/ha-acinfinity-airtap",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/OWNER/ha-acinfinity-airtap/issues",
+  "issue_tracker": "https://github.com/Xerophus/ha-acinfinity-airtap/issues",
   "requirements": [],
   "version": "0.1.0"
 }
