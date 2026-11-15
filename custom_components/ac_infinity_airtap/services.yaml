@@ -1,0 +1,17 @@
+send_raw_command:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ac_infinity_airtap
+    params:
+      required: true
+      example: '{"atType": 0, "onSpead": 3}'
+      selector:
+        object:
+    field_ids:
+      required: true
+      example: "[16, 18]"
+      selector:
+        object:

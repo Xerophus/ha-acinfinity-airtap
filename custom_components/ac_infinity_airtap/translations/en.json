@@ -1,0 +1,104 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AC Infinity account",
+        "description": "Sign in with the account used in the AC Infinity app. Only AIRTAP register fans are added.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in again",
+        "description": "AC Infinity rejected the saved password for {email}.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "The email or password is wrong.",
+      "cannot_connect": "Could not reach the AC Infinity cloud.",
+      "no_airtaps": "This account has no AIRTAP fans.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This account is already set up.",
+      "reauth_successful": "Signed in again."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "poll_interval": "Poll interval"
+        },
+        "data_description": {
+          "poll_interval": "How often to ask the AC Infinity cloud for the fans' state."
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "vent": {
+        "name": "Vent"
+      }
+    },
+    "select": {
+      "mode": {
+        "name": "Mode",
+        "state": {
+          "fan": "Fan",
+          "cool": "Cool",
+          "heat": "Heat",
+          "temp_ai": "Temp AI",
+          "advanced": "Advanced (app schedules)"
+        }
+      }
+    },
+    "sensor": {
+      "level": {
+        "name": "Fan level"
+      },
+      "cool_trigger": {
+        "name": "Cool trigger temperature"
+      },
+      "heat_trigger": {
+        "name": "Heat trigger temperature"
+      },
+      "ai_deviation": {
+        "name": "Temp AI deviation"
+      }
+    }
+  },
+  "exceptions": {
+    "advanced_not_settable": {
+      "message": "Advanced mode runs schedules set up in the AC Infinity app and can't be selected from Home Assistant."
+    },
+    "unknown_device": {
+      "message": "That device is not a loaded AIRTAP."
+    }
+  },
+  "services": {
+    "send_raw_command": {
+      "name": "Send raw command",
+      "description": "Advanced: sends a modeAndSetting PUT to an AIRTAP as-is. Meant for testing settings this integration doesn't control yet.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The AIRTAP to send to."
+        },
+        "params": {
+          "name": "Parameters",
+          "description": "API fields to set, for example {\"atType\": 0, \"onSpead\": 3}. devId and port are added automatically."
+        },
+        "field_ids": {
+          "name": "Field ids",
+          "description": "The modeAndSettingIdStr list naming the changed fields, for example [16, 18] (16 = mode, 18 = Fan mode level)."
+        }
+      }
+    }
+  }
+}
